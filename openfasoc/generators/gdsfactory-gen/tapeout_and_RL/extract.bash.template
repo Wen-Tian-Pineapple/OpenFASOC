@@ -1,0 +1,20 @@
+#!/bin/bash
+
+# Actual
+export PDK_ROOT=@@PDK_ROOT
+
+# args:
+# first arg = gds file to read
+# second arg = name of top cell in gds file to read
+
+magic -rcfile ./sky130A/sky130A.magicrc -noconsole -dnull << EOF
+gds read $1
+load $2
+extract all
+ext2spice merge aggressive
+ext2spice -o $2_pex.spice
+exit
+EOF
+
+
+rm -f $2.ext
