@@ -4,8 +4,9 @@ from gymnasium import spaces
 from gymnasium.spaces import Discrete
 from gymnasium.wrappers import EnvCompatibility
 from ray.rllib.env.wrappers.multi_agent_env_compatibility import MultiAgentEnvCompatibility
+import path_module_thing
 from sky130_nist_tapeout import single_build_and_simulation
-sky130_nist_tapeout.path.append('../generators/gdsfactory-gen/tapeout_and_RL')
+# sky130_nist_tapeout.path.append('../generators/gdsfactory-gen/tapeout_and_RL')
 import numpy as np
 import random
 import psutil
@@ -49,10 +50,10 @@ class Envir(gym.Env):
         # design specs
         if self.generalize == True:
             if self.valid == False:
-                specs = yaml.safe_load(Path('train1.yaml').read_text())
+                specs = yaml.safe_load(Path('train.yaml').read_text())
             else:
                 specs = inputspec
-                
+
         self.specs = specs
 
         self.specs_ideal = []
@@ -64,17 +65,19 @@ class Envir(gym.Env):
         params = {
                   "diffpair_params0" : [1, 8, 1],       
                   "diffpair_params1" : [0.5, 2.1, 0.1],   
-                  "diffpair_params2" : [1, 5, 1],
+                  "diffpair_params2" : [1, 9, 1],
                   "Diffpair_bias0" : [1, 8, 1],
                   "Diffpair_bias1" : [1, 4.5, 0.5],
                   "Diffpair_bias2" : [3, 13, 1],
                   "pamp_hparams0" : [1, 8, 1], 
                   "pamp_hparams1" : [0.5, 2.1, 0.1], 
-                  "pamp_hparams2" : [3, 13, 1],
+                  "pamp_hparams2" : [2, 11, 1],
                   "bias0" : [1, 8, 1], 
                   "bias1" : [0.5, 2.1, 0.1], 
                   "bias2" : [3, 13, 1],
                   "bias3" : [2, 4, 1],
+                  "half_pload1": [3, 7, 1],
+                  "half_pload3": [4, 9, 1],
                   "mim_cap_rows" : [1, 4, 1],
                   }
         self.params = []
@@ -101,7 +104,7 @@ class Envir(gym.Env):
         for spec in list(self.specs.values()):
                 self.global_g.append(float(spec[self.fixed_goal_idx]))
         self.g_star = np.array(self.global_g)
-        self.global_g = np.array([3000338000.0, 1.0*10**13])
+        self.global_g = np.array([60003380.0, 3e12])
 
         #objective number (used for validation)g
         self.obj_idx = 0
@@ -135,7 +138,7 @@ class Envir(gym.Env):
         self.specs_ideal_norm = self.lookup(self.specs_ideal, self.global_g)
 
         #initialize current parameters
-        self.cur_params_idx = np.array([1, 5, 3, 5, 2, 1, 6, 0, 5, 5, 1, 1, 1, 0])
+        self.cur_params_idx = np.array([3, 5, 7, 5, 4, 0, 3, 0, 2, 5, 15, 1, 0, 3, 4, 2])
         # param array
         self.cur_specs = self.update(self.cur_params_idx)
         cur_spec_norm = self.lookup(self.cur_specs, self.global_g)
@@ -231,7 +234,7 @@ class Envir(gym.Env):
         for i,rel_spec in enumerate(rel_specs):
             if rel_spec < -0.02:
                 trueorfalse = False
-        
+
         if trueorfalse:
             return 2.0+reward
         else:
@@ -245,16 +248,19 @@ class Envir(gym.Env):
 
         #run param vals and simulate
         #cur_specs = OrderedDict(sorted(self.sim_env.create_design_and_simulate(param_val[0])[1].items(), key=lambda k:k[0]))
-        inputparam = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 3.0, 0.0, 0.0, 0.0, 0.0, 5.0, 1.0, 16.0, 6.0, 2.0, 4.0, 12.0, 12.0, 0.0, 2.0])
+        inputparam = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 3.0, 0.0, 0.0, 0.0, 0.0, 5.0, 1.0, 16.0, 6.0, 2.0, 4.0, 0.0, 1.0, 0.0, 12.0, 12.0, 0.0, 2.0])
+
         inputparam[0:3] = params[0:3]
         inputparam[3:6] = params[3:6]
         inputparam[6:9] = params[6:9]
         inputparam[10:14] = params[9:13]
-        inputparam[22] = params[13]
+        inputparam[20] = params[13]
+        inputparam[22] = params[14]
+        inputparam[25] = params[15]
         result = single_build_and_simulation(inputparam,-269)
         specs = np.array([0.0 , 0.0])
         specs[0] = result["ugb"]
-        specs[1] = result["ugb"]/result["power"]
+        specs[1] = result["ugb"]/(result["Ibias_diffpair"]+result["Ibias_commonsource"])
         cur_specs = specs
 
         return cur_specs
